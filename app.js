@@ -44,37 +44,65 @@ const convertResponseObject = (dbObject) => {
 
 const hasPriorityAndStatusProperties = (requestQuery) => {
   return (
-    requestQuery.priority !== undefined && requestQuery.status !== undefined
+    (requestQuery.priority === "HIGH" ||
+      requestQuery.priority === "MEDIUM" ||
+      requestQuery.priority === "LOW") &&
+    (requestQuery.status === "TO DO" ||
+      requestQuery.status === "IN PROGRESS" ||
+      requestQuery.status === "DONE")
   );
 };
 const hasCategoryAndStatusProperties = (requestQuery) => {
   return (
-    requestQuery.category !== undefined && requestQuery.status !== undefined
+    (requestQuery.category === "WORK" ||
+      requestQuery.category === "HOME" ||
+      requestQuery.category === "LEARNING") &&
+    (requestQuery.status === "TO DO" ||
+      requestQuery.status === "IN PROGRESS" ||
+      requestQuery.status === "DONE")
   );
 };
 const hasCategoryAndPriorityProperties = (requestQuery) => {
   return (
-    requestQuery.category !== undefined && requestQuery.priority !== undefined
+    (requestQuery.category === "WORK" ||
+      requestQuery.category === "HOME" ||
+      requestQuery.category === "LEARNING") &&
+    (requestQuery.priority === "HIGH" ||
+      requestQuery.priority === "MEDIUM" ||
+      requestQuery.priority === "LOW")
   );
 };
 
 const hasPriorityProperty = (requestQuery) => {
-  return requestQuery.priority !== undefined;
+  return (
+    requestQuery.priority === "HIGH" ||
+    requestQuery.priority === "MEDIUM" ||
+    requestQuery.priority === "LOW"
+  );
 };
 
 const hasStatusProperty = (requestQuery) => {
-  return requestQuery.status !== undefined;
+  return (
+    requestQuery.status === "TO DO" ||
+    requestQuery.status === "IN PROGRESS" ||
+    requestQuery.status === "DONE"
+  );
 };
 
 const hasCategoryProperty = (requestQuery) => {
-  return requestQuery.category !== undefined;
+  return (
+    requestQuery.category === "WORK" ||
+    requestQuery.category === "HOME" ||
+    requestQuery.category === "LEARNING"
+  );
 };
 
 app.get("/todos/", async (request, response) => {
   let data = null;
   let formattedData = null;
   let getTodosQuery = "";
-  let k1 = true;
+  let updatedData = "";
+
   const { search_q = "", priority, status, category } = request.query;
 
   switch (true) {
@@ -88,6 +116,14 @@ app.get("/todos/", async (request, response) => {
         todo LIKE '%${search_q}%'
         AND status = '${status}'
         AND priority = '${priority}';`;
+
+      data = await database.all(getTodosQuery);
+      if (data !== undefined) {
+        updatedData = data.map((each) => convertResponseObject(each));
+      } else {
+        response.status(400);
+        response.send("Invalid Todo Status");
+      }
       break;
     case hasCategoryAndPriorityProperties(request.query):
       getTodosQuery = `
@@ -112,8 +148,7 @@ app.get("/todos/", async (request, response) => {
          AND status = '${status}';`;
       break;
     case hasPriorityProperty(request.query):
-      if (priority === "HIGH" || "MEDIUM" || "LOW") {
-        getTodosQuery = `
+      getTodosQuery = `
       SELECT
         *
       FROM
@@ -121,15 +156,10 @@ app.get("/todos/", async (request, response) => {
       WHERE
         todo LIKE '%${search_q}%'
         AND priority = '${priority}';`;
-      } else {
-        k1 = false;
-        response.status(400);
-        response.send("Invalid Todo Priority");
-      }
+
       break;
     case hasCategoryProperty(request.query):
-      if (category === "WORK" || "HOME" || "LEARNING") {
-        getTodosQuery = `
+      getTodosQuery = `
       SELECT
         *
       FROM
@@ -137,15 +167,10 @@ app.get("/todos/", async (request, response) => {
       WHERE
         todo LIKE '%${search_q}%'
         AND category = '${category}';`;
-      } else {
-        k1 = false;
-        response.status(400);
-        response.send("Invalid Todo Category");
-      }
+
       break;
     case hasStatusProperty(request.query):
-      if (status === "TO DO" || "IN PROGRESS" || "DONE") {
-        getTodosQuery = `
+      getTodosQuery = `
       SELECT
         *
       FROM
@@ -153,11 +178,7 @@ app.get("/todos/", async (request, response) => {
       WHERE
         todo LIKE '%${search_q}%'
         AND status = '${status}';`;
-      } else {
-        k1 = false;
-        response.status(400);
-        response.send("Invalid Todo Status");
-      }
+
       break;
     default:
       getTodosQuery = `
@@ -169,10 +190,28 @@ app.get("/todos/", async (request, response) => {
         todo LIKE '%${search_q}%';`;
   }
 
-  if (k1) {
-    data = await database.all(getTodosQuery);
+  data = await database.all(getTodosQuery);
+  if (data !== undefined) {
     const updatedData = data.map((each) => convertResponseObject(each));
     response.send(updatedData);
+  } else {
+    switch (false) {
+      case hasPriorityProperty(request.query):
+        response.status(400);
+        response.send("Invalid Todo Priority");
+
+        break;
+      case hasCategoryProperty(request.query):
+        response.status(400);
+        response.send("Invalid Todo Category");
+
+        break;
+      case hasStatusProperty(request.query):
+        response.status(400);
+        response.send("Invalid Todo Status");
+
+        break;
+    }
   }
 });
 
@@ -191,13 +230,21 @@ app.get("/todos/:todoId/", async (request, response) => {
 
 app.post("/todos/", async (request, response) => {
   const { id, todo, priority, status, category, dueDate } = request.body;
-  if (status !== "TO DO" || "IN PROGRESS" || "DONE") {
+  if (status !== "TO DO" || status !== "IN PROGRESS" || status !== "DONE") {
     response.status(400);
     response.send("Invalid Todo Status");
-  } else if (category !== "WORK" || "HOME" || "LEARNING") {
+  } else if (
+    category !== "WORK" ||
+    category !== "HOME" ||
+    category !== "LEARNING"
+  ) {
     response.status(400);
     response.send("Invalid Todo Category");
-  } else if (priority !== "HIGH" || "MEDIUM" || "LOW") {
+  } else if (
+    priority !== "HIGH" ||
+    priority !== "MEDIUM" ||
+    priority !== "LOW"
+  ) {
     response.status(400);
     response.send("Invalid Todo Priority");
   } else if (!isValid(new Date(dueDate))) {
